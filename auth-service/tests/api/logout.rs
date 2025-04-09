@@ -8,4 +8,3 @@ async fn logout_succeeds() {
 
     assert_eq!(response.status().as_u16(), 200);
 }
-
