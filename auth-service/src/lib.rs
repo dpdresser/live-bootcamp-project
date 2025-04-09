@@ -14,11 +14,11 @@ impl Application {
     pub async fn build(address: &str) -> Result<Self, Box<dyn Error>> {
         let router = Router::new()
             .nest_service("/", ServeDir::new("assets"))
-            .route("/signup", post(routes::signup))
-            .route("/login", post(routes::login))
-            .route("/logout", post(routes::logout))
-            .route("/verify-2fa", post(routes::verify_2fa))
-            .route("/verify-token", post(routes::verify_token));
+            .route("/signup", post(routes::post_signup))
+            .route("/login", post(routes::post_login))
+            .route("/logout", post(routes::post_logout))
+            .route("/verify-2fa", post(routes::post_verify_2fa))
+            .route("/verify-token", post(routes::post_verify_token));
 
         let listener = TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
