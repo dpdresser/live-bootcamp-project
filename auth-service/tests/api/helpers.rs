@@ -19,7 +19,7 @@ impl TestApp {
 
         let http_client = reqwest::Client::new();
 
-        TestApp {
+        Self {
             address,
             http_client,
         }
@@ -43,10 +43,6 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request")
-    }
-
-    pub fn get_random_email() -> String {
-        format!("{}@example.com", Uuid::new_v4())
     }
 
     pub async fn post_login(&self) -> reqwest::Response {
@@ -80,4 +76,8 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+}
+
+pub fn get_random_email() -> String {
+    format!("{}@example.com", Uuid::new_v4())
 }
