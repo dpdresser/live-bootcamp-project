@@ -1,22 +1,15 @@
 use std::collections::HashMap;
 
-use crate::domain::User;
-
-#[derive(Debug, PartialEq)]
-pub enum UserStoreError {
-    UserAlreadyExists,
-    UserNotFound,
-    InvalidCredentials,
-    UnexpectedError,
-}
+use crate::domain::{User, UserStore, UserStoreError};
 
 #[derive(Default)]
 pub struct HashmapUserStore {
     users: HashMap<String, User>,
 }
 
-impl HashmapUserStore {
-    pub fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
+#[async_trait::async_trait]
+impl UserStore for HashmapUserStore {
+    async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
         if self.users.contains_key(&user.email) {
             return Err(UserStoreError::UserAlreadyExists);
         }
@@ -26,7 +19,7 @@ impl HashmapUserStore {
         Ok(())
     }
 
-    pub fn get_user(&self, email: &str) -> Result<&User, UserStoreError> {
+    async fn get_user<'a>(&'a self, email: &str) -> Result<&'a User, UserStoreError> {
         if let Some(user) = self.users.get(email) {
             return Ok(user);
         }
@@ -34,7 +27,7 @@ impl HashmapUserStore {
         Err(UserStoreError::UserNotFound)
     }
 
-    pub fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError> {
+    async fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError> {
         if let Some(user) = self.users.get(email) {
             if user.password == password {
                 return Ok(());
@@ -61,6 +54,7 @@ mod tests {
                 password: "password123".to_string(),
                 requires_2fa: true
             })
+            .await
             .is_ok());
     }
 
@@ -74,10 +68,10 @@ mod tests {
             requires_2fa: true,
         };
 
-        let _ = user_store.add_user(test_user.clone());
+        let _ = user_store.add_user(test_user.clone()).await;
 
         assert_eq!(
-            *(user_store.get_user("test@example.com").unwrap()),
+            *(user_store.get_user("test@example.com").await).unwrap(),
             test_user
         );
     }
@@ -92,10 +86,11 @@ mod tests {
             requires_2fa: true,
         };
 
-        let _ = user_store.add_user(test_user.clone());
+        let _ = user_store.add_user(test_user.clone()).await;
 
         assert!(user_store
             .validate_user("test@example.com", "password123")
+            .await
             .is_ok());
     }
 }
