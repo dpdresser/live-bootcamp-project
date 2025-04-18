@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::domain::{User, UserStore, UserStoreError};
+use crate::domain::{Email, Password, User, UserStore, UserStoreError};
 
 #[derive(Default)]
 pub struct HashmapUserStore {
@@ -10,26 +10,30 @@ pub struct HashmapUserStore {
 #[async_trait::async_trait]
 impl UserStore for HashmapUserStore {
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
-        if self.users.contains_key(&user.email) {
+        if self.users.contains_key(user.email.as_ref()) {
             return Err(UserStoreError::UserAlreadyExists);
         }
 
-        self.users.insert(user.email.clone(), user);
+        self.users.insert(user.email.as_ref().to_string(), user);
 
         Ok(())
     }
 
-    async fn get_user<'a>(&'a self, email: &str) -> Result<&'a User, UserStoreError> {
-        if let Some(user) = self.users.get(email) {
+    async fn get_user<'a>(&'a self, email: &'a Email) -> Result<&'a User, UserStoreError> {
+        if let Some(user) = self.users.get(email.as_ref()) {
             return Ok(user);
         }
 
         Err(UserStoreError::UserNotFound)
     }
 
-    async fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError> {
-        if let Some(user) = self.users.get(email) {
-            if user.password == password {
+    async fn validate_user(
+        &self,
+        email: &Email,
+        password: &Password,
+    ) -> Result<(), UserStoreError> {
+        if let Some(user) = self.users.get(email.as_ref()) {
+            if user.password == *password {
                 return Ok(());
             } else {
                 return Err(UserStoreError::InvalidCredentials);
@@ -50,8 +54,8 @@ mod tests {
 
         assert!(user_store
             .add_user(User {
-                email: "test@example.com".to_string(),
-                password: "password123".to_string(),
+                email: Email::parse("test@example.com").unwrap(),
+                password: Password::parse("password123").unwrap(),
                 requires_2fa: true
             })
             .await
@@ -63,15 +67,15 @@ mod tests {
         let mut user_store = HashmapUserStore::default();
 
         let test_user = User {
-            email: "test@example.com".to_string(),
-            password: "password123".to_string(),
+            email: Email::parse("test@example.com").unwrap(),
+            password: Password::parse("password123").unwrap(),
             requires_2fa: true,
         };
 
         let _ = user_store.add_user(test_user.clone()).await;
 
         assert_eq!(
-            *(user_store.get_user("test@example.com").await).unwrap(),
+            *(user_store.get_user(&test_user.email).await).unwrap(),
             test_user
         );
     }
@@ -81,15 +85,15 @@ mod tests {
         let mut user_store = HashmapUserStore::default();
 
         let test_user = User {
-            email: "test@example.com".to_string(),
-            password: "password123".to_string(),
+            email: Email::parse("test@example.com").unwrap(),
+            password: Password::parse("password123").unwrap(),
             requires_2fa: true,
         };
 
         let _ = user_store.add_user(test_user.clone()).await;
 
         assert!(user_store
-            .validate_user("test@example.com", "password123")
+            .validate_user(&test_user.email, &test_user.password)
             .await
             .is_ok());
     }
