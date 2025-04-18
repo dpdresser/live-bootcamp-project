@@ -1,6 +1,4 @@
-use crate::domain::{Email, Password};
-
-use super::AuthAPIError;
+use super::{Email, Password};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct User {
@@ -10,15 +8,11 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(email: &str, password: &str, requires_2fa: bool) -> Result<Self, AuthAPIError> {
-        if let (Ok(email), Ok(password)) = (Email::parse(email), Password::parse(password)) {
-            Ok(Self {
-                email,
-                password,
-                requires_2fa,
-            })
-        } else {
-            Err(AuthAPIError::InvalidCredentials)
+    pub fn new(email: Email, password: Password, requires_2fa: bool) -> Self {
+        Self {
+            email,
+            password,
+            requires_2fa,
         }
     }
 }

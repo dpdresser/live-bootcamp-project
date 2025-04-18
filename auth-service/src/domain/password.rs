@@ -1,20 +1,21 @@
 #[derive(Debug, Clone, PartialEq)]
 pub struct Password(String);
 
-#[derive(Debug)]
-pub struct ParsePasswordError;
-
 impl Password {
-    pub fn parse(password: &str) -> Result<Self, ParsePasswordError> {
-        if password.len() > 7 {
-            Ok(Password(password.to_string()))
+    pub fn parse(s: String) -> Result<Self, String> {
+        if validate_password(&s) {
+            Ok(Self(s))
         } else {
-            Err(ParsePasswordError)
+            Err("Failed to parse string to a Password type".to_string())
         }
     }
 }
 
-impl std::convert::AsRef<str> for Password {
+fn validate_password(s: &str) -> bool {
+    s.len() >= 8
+}
+
+impl AsRef<str> for Password {
     fn as_ref(&self) -> &str {
         &self.0
     }
@@ -22,22 +23,33 @@ impl std::convert::AsRef<str> for Password {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::Password;
+
+    use fake::faker::internet::en::Password as FakePassword;
+    use fake::Fake;
 
     #[test]
-    fn parse_password_succeeds() {
-        let password = "password123";
-        let password = Password::parse(password);
-
-        assert!(password.is_ok());
-        assert_eq!(password.unwrap().as_ref(), "password123");
+    fn empty_string_is_rejected() {
+        let password = "".to_owned();
+        assert!(Password::parse(password).is_err());
+    }
+    #[test]
+    fn string_less_than_8_characters_is_rejected() {
+        let password = "1234567".to_owned();
+        assert!(Password::parse(password).is_err());
     }
 
-    #[test]
-    fn parse_password_fails() {
-        let password = "pass";
-        let password = Password::parse(password);
+    #[derive(Debug, Clone)]
+    struct ValidPasswordFixture(pub String);
 
-        assert!(password.is_err());
+    impl quickcheck::Arbitrary for ValidPasswordFixture {
+        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+            let password = FakePassword(8..30).fake_with_rng(g);
+            Self(password)
+        }
+    }
+    #[quickcheck_macros::quickcheck]
+    fn valid_passwords_are_parsed_successfully(valid_password: ValidPasswordFixture) -> bool {
+        Password::parse(valid_password.0).is_ok()
     }
 }
