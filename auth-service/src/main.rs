@@ -1,4 +1,6 @@
-use auth_service::{app_state::AppState, services::HashmapUserStore, Application};
+use auth_service::{
+    app_state::AppState, services::HashmapUserStore, utils::constants::prod, Application,
+};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -9,7 +11,7 @@ async fn main() {
         user_store: Arc::new(RwLock::new(user_store)),
     };
 
-    let app = Application::build(app_state, "0.0.0.0:3000")
+    let app = Application::build(app_state, prod::APP_ADDRESS)
         .await
         .expect("Failed to build app");
 

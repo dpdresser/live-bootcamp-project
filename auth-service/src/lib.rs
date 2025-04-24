@@ -1,5 +1,5 @@
 use axum::{
-    http::StatusCode,
+    http::{Method, StatusCode},
     response::{IntoResponse, Response},
     routing::post,
     serve::Serve,
@@ -9,7 +9,7 @@ use domain::AuthAPIError;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use tokio::net::TcpListener;
-use tower_http::services::ServeDir;
+use tower_http::{cors::CorsLayer, services::ServeDir};
 
 pub mod app_state;
 pub mod domain;
@@ -26,6 +26,16 @@ pub struct Application {
 
 impl Application {
     pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
+        let allowed_origins = [
+            "http://localhost::8000".parse()?,
+            "http://206.189.186.25::8000".parse()?,
+        ];
+
+        let cors = CorsLayer::new()
+            .allow_methods([Method::GET, Method::POST])
+            .allow_credentials(true)
+            .allow_origin(allowed_origins);
+
         let router = Router::new()
             .nest_service("/", ServeDir::new("assets"))
             .route("/signup", post(routes::signup))
@@ -33,7 +43,8 @@ impl Application {
             .route("/logout", post(routes::logout))
             .route("/verify-2fa", post(routes::verify_2fa))
             .route("/verify-token", post(routes::verify_token))
-            .with_state(app_state);
+            .with_state(app_state)
+            .layer(cors);
 
         let listener = TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
@@ -64,6 +75,8 @@ impl IntoResponse for AuthAPIError {
             AuthAPIError::UnexpectedError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
             }
+            AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, "Missing session token"),
+            AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid session token"),
         };
 
         let body = Json(ErrorResponse {
