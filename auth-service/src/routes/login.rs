@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    domain::{AuthAPIError, Email, Password},
+    domain::{AuthAPIError, Email, LoginAttemptId, Password, TwoFACode},
     utils::auth::generate_auth_cookie,
 };
 
@@ -30,11 +30,58 @@ pub async fn login(
         .await
         .map_err(|_| AuthAPIError::IncorrectCredentials)?;
 
-    let auth_cookie =
-        generate_auth_cookie(&user.email).map_err(|_| AuthAPIError::UnexpectedError)?;
+    match user.requires_2fa {
+        true => handle_2fa(&email, &state, jar).await,
+        false => handle_no_2fa(&user.email, jar).await,
+    }
+
+    // let auth_cookie =
+    //     generate_auth_cookie(&user.email).map_err(|_| AuthAPIError::UnexpectedError)?;
+    // let updated_jar = jar.add(auth_cookie);
+
+    // Ok((updated_jar, StatusCode::OK.into_response()))
+}
+
+async fn handle_2fa(
+    email: &Email,
+    state: &AppState,
+    jar: CookieJar,
+) -> Result<(CookieJar, (StatusCode, Json<LoginResponse>)), AuthAPIError> {
+    let login_attempt_id = LoginAttemptId::default();
+    let two_fa_code = TwoFACode::default();
+
+    state
+        .two_fa_code_store
+        .write()
+        .await
+        .add_code(email.clone(), login_attempt_id.clone(), two_fa_code)
+        .await
+        .map_err(|_| AuthAPIError::UnexpectedError)?;
+
+    Ok((
+        jar,
+        (
+            StatusCode::PARTIAL_CONTENT,
+            LoginResponse::TwoFactorAuth(TwoFactorAuthResponse {
+                message: "2FA required".to_string(),
+                login_attempt_id: login_attempt_id.as_ref().to_string(),
+            })
+            .into(),
+        ),
+    ))
+}
+
+async fn handle_no_2fa(
+    email: &Email,
+    jar: CookieJar,
+) -> Result<(CookieJar, (StatusCode, Json<LoginResponse>)), AuthAPIError> {
+    let auth_cookie = generate_auth_cookie(email).map_err(|_| AuthAPIError::UnexpectedError)?;
     let updated_jar = jar.add(auth_cookie);
 
-    Ok((updated_jar, StatusCode::OK.into_response()))
+    Ok((
+        updated_jar,
+        (StatusCode::OK, LoginResponse::RegularAuth.into()),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -43,8 +90,15 @@ pub struct LoginRequest {
     pub password: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum LoginResponse {
+    RegularAuth,
+    TwoFactorAuth(TwoFactorAuthResponse),
+}
+
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
-pub struct LoginResponse {
+pub struct TwoFactorAuthResponse {
     pub message: String,
     #[serde(rename = "loginAttemptId")]
     pub login_attempt_id: String,
