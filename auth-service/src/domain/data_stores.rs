@@ -92,7 +92,7 @@ impl TwoFACode {
 impl Default for TwoFACode {
     fn default() -> Self {
         let mut rng = rand::thread_rng();
-        let code = rng.gen_range(100000..=999999);
+        let code = rng.gen_range(100000..999999);
         Self(code.to_string())
     }
 }
