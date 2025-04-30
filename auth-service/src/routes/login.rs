@@ -54,7 +54,15 @@ async fn handle_2fa(
         .two_fa_code_store
         .write()
         .await
-        .add_code(email.clone(), login_attempt_id.clone(), two_fa_code)
+        .add_code(email.clone(), login_attempt_id.clone(), two_fa_code.clone())
+        .await
+        .map_err(|_| AuthAPIError::UnexpectedError)?;
+
+    state
+        .email_client
+        .read()
+        .await
+        .send_email(email, "2FA Code", two_fa_code.as_ref())
         .await
         .map_err(|_| AuthAPIError::UnexpectedError)?;
 
