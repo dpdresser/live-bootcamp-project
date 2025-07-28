@@ -37,7 +37,7 @@ services:
         condition: service_started 
   certbot:
     image: certbot/certbot # use the official certbot image
-    restart: "always" # automatically restart container when server crashes
+    restart: "no" # Don't restart - certbot should run once and exit
     volumes:
       - certbot-etc:/etc/letsencrypt # mount local certbot configuration directory into the container
       - certbot-var:/var/lib/letsencrypt # mount local certbot data directory into the container
