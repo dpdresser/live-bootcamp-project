@@ -46,7 +46,7 @@ services:
       - app-network
     depends_on:
       - webserver
-    command: certonly --webroot --webroot-path=/var/www/html --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email --staging -d lgr.ddrcode.me -d www.lgr.ddrcode.me
+    command: certonly --webroot --webroot-path=/var/www/html --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email --staging --keep-until-expiring --non-interactive -d lgr.ddrcode.me -d www.lgr.ddrcode.me
 volumes:
   certbot-etc:
   certbot-var:
