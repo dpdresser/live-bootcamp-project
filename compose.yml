@@ -23,11 +23,13 @@ services:
     restart: "always" # automatically restart container when server crashes
     ports:
       - "80:80" # expose port 80 so that applications outside the container can connect to it 
+      - "443:443" # expose port 443 for HTTPS traffic
     volumes:
       - webroot:/var/www/html
       - ./nginx.conf:/etc/nginx/conf.d/default.conf # mount nginx.conf from project root
       - certbot-etc:/etc/letsencrypt # mount local certbot configuration directory into the container
       - certbot-var:/var/lib/letsencrypt # mount local certbot data directory into the container
+      - dhparam:/etc/ssl/certs
     networks:
       - app-network
     depends_on: # only run webserver after app-service and auth-service have started
@@ -51,6 +53,12 @@ volumes:
   certbot-etc:
   certbot-var:
   webroot:
+  dhparam:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/ddresser05/auth-service/dhparam
+      o: bind
 networks:
   app-network:
     driver: bridge
