@@ -93,6 +93,8 @@ jobs:
         script: |
           cd ~
           export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
+          export CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}
           docker compose down
+          docker volume rm root_webroot || true
           docker compose pull
           docker compose up -d
