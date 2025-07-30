@@ -10,9 +10,6 @@ pub async fn signup(
     State(state): State<AppState>,
     Json(request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    if request.email.is_empty() || !request.email.contains("@") || request.password.len() < 8 {
-        return Err(AuthAPIError::InvalidCredentials);
-    }
     let email = Email::parse(&request.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
     let password =
         Password::parse(&request.password).map_err(|_| AuthAPIError::InvalidCredentials)?;
