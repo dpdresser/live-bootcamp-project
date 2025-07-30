@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    domain::{AuthAPIError, User},
-    services::UserStoreError,
+    domain::{AuthAPIError, User, UserStoreError},
 };
 
 pub async fn signup(
@@ -17,7 +16,7 @@ pub async fn signup(
 
     let user = User::new(request.email, request.password, request.requires_2fa);
 
-    match state.user_store.write().await.add_user(user) {
+    match state.user_store.write().await.add_user(user).await {
         Ok(_) => (),
         Err(UserStoreError::UserAlreadyExists) => {
             return Err(AuthAPIError::UserAlreadyExists);

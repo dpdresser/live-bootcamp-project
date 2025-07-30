@@ -53,16 +53,19 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Build and push Docker images
-      uses: docker/bake-action@v2.3.0
-      with:
-        push: true
-        files: |
-          compose.yml
-          compose.override.yml
-        set: |
-          *.cache-from=type=gha
-          *.cache-to=type=gha,mode=max
+    - name: Build and push app-service Docker image
+      run: |
+        cd app-service
+        docker build -t ddresser05/app-service:latest -t ddresser05/app-service:${{ github.sha }} .
+        docker push ddresser05/app-service:latest
+        docker push ddresser05/app-service:${{ github.sha }}
+
+    - name: Build and push auth-service Docker image
+      run: |
+        cd auth-service
+        docker build -t ddresser05/auth-service:latest -t ddresser05/auth-service:${{ github.sha }} .
+        docker push ddresser05/auth-service:latest
+        docker push ddresser05/auth-service:${{ github.sha }}
 
   deploy:
     needs: build
@@ -99,5 +102,6 @@ jobs:
           echo "CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}" >> .env
           docker compose down
           docker volume rm root_webroot || true
-          docker compose pull
-          docker compose --profile prod up -d
+          docker system prune -f
+          docker compose pull --ignore-pull-failures
+          docker compose --profile prod up -d --force-recreate
