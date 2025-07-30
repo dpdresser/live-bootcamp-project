@@ -97,6 +97,19 @@ jobs:
           cd ~
           echo "AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}" > .env
           echo "CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}" >> .env
-          docker compose down
+          
+          # Stop and remove containers
+          docker compose down --remove-orphans
+          
+          # Force remove the specific images to ensure fresh pull
+          docker rmi ddresser05/app-service:latest || true
+          docker rmi ddresser05/auth-service:latest || true
+          
+          # Clean up unused images
+          docker image prune -f
+          
+          # Pull fresh images (this will definitely download new ones now)
           docker compose pull
-          docker compose --profile prod up -d
+          
+          # Start with fresh containers
+          docker compose --profile prod up -d --force-recreate
