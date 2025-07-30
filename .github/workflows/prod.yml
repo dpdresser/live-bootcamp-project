@@ -56,16 +56,21 @@ jobs:
     - name: Build and push app-service Docker image
       run: |
         cd app-service
-        docker build -t ddresser05/app-service:latest -t ddresser05/app-service:${{ github.sha }} .
-        docker push ddresser05/app-service:latest
-        docker push ddresser05/app-service:${{ github.sha }}
-
-    - name: Build and push auth-service Docker image
-      run: |
-        cd auth-service
-        docker build -t ddresser05/auth-service:latest -t ddresser05/auth-service:${{ github.sha }} .
-        docker push ddresser05/auth-service:latest
-        docker push ddresser05/auth-service:${{ github.sha }}
+        docker build -t ddresser05/app-service:latest -t ddresser05/app-service:${{ github.sha }} . &
+        APP_PID=$!
+        
+        cd ../auth-service
+        docker build -t ddresser05/auth-service:latest -t ddresser05/auth-service:${{ github.sha }} . &
+        AUTH_PID=$!
+        
+        wait $APP_PID
+        wait $AUTH_PID
+        
+        docker push ddresser05/app-service:latest &
+        docker push ddresser05/app-service:${{ github.sha }} &
+        docker push ddresser05/auth-service:latest &
+        docker push ddresser05/auth-service:${{ github.sha }} &
+        wait
 
   deploy:
     needs: build
@@ -102,6 +107,6 @@ jobs:
           echo "CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}" >> .env
           docker compose down
           docker volume rm root_webroot || true
-          docker system prune -f
           docker compose pull --ignore-pull-failures
+          docker image prune -f
           docker compose --profile prod up -d --force-recreate
