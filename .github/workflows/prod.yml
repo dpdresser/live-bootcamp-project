@@ -95,7 +95,8 @@ jobs:
         password: ${{ secrets.DROPLET_PASSWORD }}
         script: |
           cd ~
-          export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
+          echo "AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}" > .env
+          echo "CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}" >> .env
           docker compose down
           docker compose pull
           docker compose --profile prod up -d
