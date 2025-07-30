@@ -42,4 +42,4 @@ WORKDIR /app
 COPY --from=chiseled_builder /rootfs /
 COPY --from=builder /app/target/release/auth-service /app
 COPY --from=builder /app/assets /app/assets
-ENTRYPOINT ["/app/auth-service"]
+ENTRYPOINT ["/usr/local/bin/auth-service"]
