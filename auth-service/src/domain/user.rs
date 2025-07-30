@@ -1,11 +1,13 @@
+use crate::domain::{Email, Password};
+
 pub struct User {
-    email: String,
-    password: String,
+    email: Email,
+    password: Password,
     requires_2fa: bool,
 }
 
 impl User {
-    pub fn new(email: String, password: String, requires_2fa: bool) -> Self {
+    pub fn new(email: Email, password: Password, requires_2fa: bool) -> Self {
         Self {
             email,
             password,
@@ -14,11 +16,11 @@ impl User {
     }
 
     pub fn email(&self) -> &str {
-        &self.email
+        self.email.as_ref()
     }
 
     pub fn password(&self) -> &str {
-        &self.password
+        self.password.as_ref()
     }
 
     pub fn requires_2fa(&self) -> bool {

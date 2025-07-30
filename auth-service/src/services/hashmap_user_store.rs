@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::domain::{User, UserStore, UserStoreError};
+use crate::domain::{Email, Password, User, UserStore, UserStoreError};
 
 #[derive(Default)]
 pub struct HashMapUserStore {
@@ -17,13 +17,15 @@ impl UserStore for HashMapUserStore {
         Ok(())
     }
 
-    async fn get_user(&self, email: &str) -> Result<&User, UserStoreError> {
-        self.users.get(email).ok_or(UserStoreError::UserNotFound)
+    async fn get_user(&self, email: Email) -> Result<&User, UserStoreError> {
+        self.users
+            .get(email.as_ref())
+            .ok_or(UserStoreError::UserNotFound)
     }
 
-    async fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError> {
+    async fn validate_user(&self, email: Email, password: Password) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
-        if user.password() == password {
+        if user.password() == password.as_ref() {
             Ok(())
         } else {
             Err(UserStoreError::InvalidCredentials)
@@ -39,8 +41,8 @@ mod tests {
     async fn test_add_user() {
         let mut store = HashMapUserStore::default();
         let user = User::new(
-            "test@example.com".to_string(),
-            "password123".to_string(),
+            Email::parse("test@example.com").unwrap(),
+            Password::parse("password123!").unwrap(),
             false,
         );
         assert_eq!(store.add_user(user).await.unwrap(), ());
@@ -51,12 +53,15 @@ mod tests {
     async fn test_get_user() {
         let mut store = HashMapUserStore::default();
         let user = User::new(
-            "test@example.com".to_string(),
-            "password123".to_string(),
+            Email::parse("test@example.com").unwrap(),
+            Password::parse("password123!").unwrap(),
             false,
         );
         store.add_user(user).await.unwrap();
-        let retrieved_user = store.get_user("test@example.com").await.unwrap();
+        let retrieved_user = store
+            .get_user(Email::parse("test@example.com").unwrap())
+            .await
+            .unwrap();
         assert_eq!(retrieved_user.email(), "test@example.com");
     }
 
@@ -64,13 +69,16 @@ mod tests {
     async fn test_validate_user() {
         let mut store = HashMapUserStore::default();
         let user = User::new(
-            "test@example.com".to_string(),
-            "password123".to_string(),
+            Email::parse("test@example.com").unwrap(),
+            Password::parse("password123!").unwrap(),
             false,
         );
         store.add_user(user).await.unwrap();
         assert!(store
-            .validate_user("test@example.com", "password123")
+            .validate_user(
+                Email::parse("test@example.com").unwrap(),
+                Password::parse("password123!").unwrap()
+            )
             .await
             .is_ok());
     }

@@ -43,7 +43,7 @@ async fn should_return_201_if_valid_input() {
     let response = app
         .signup(&serde_json::json!({
             "email": random_email,
-            "password": "password123",
+            "password": "validPass123!",
             "requires2FA": true,
         }))
         .await;
@@ -73,14 +73,40 @@ async fn should_return_400_if_invalid_input() {
 
     let random_email = get_random_email();
     let test_cases = [
+        // Password too short
         serde_json::json!({
             "email": random_email,
-            "password": "pass",
+            "password": "short1!",
             "requires2FA": true,
         }),
+        // Password missing number
+        serde_json::json!({
+            "email": random_email,
+            "password": "password!",
+            "requires2FA": true,
+        }),
+        // Password missing special character
+        serde_json::json!({
+            "email": random_email,
+            "password": "password123",
+            "requires2FA": true,
+        }),
+        // Invalid email format
         serde_json::json!({
             "email": "invalid-email",
-            "password": "password123",
+            "password": "validPass123!",
+            "requires2FA": true,
+        }),
+        // Invalid email - missing @
+        serde_json::json!({
+            "email": "invalid.email.com",
+            "password": "validPass123!",
+            "requires2FA": true,
+        }),
+        // Invalid email - missing domain
+        serde_json::json!({
+            "email": "user@",
+            "password": "validPass123!",
             "requires2FA": true,
         }),
     ];
@@ -112,7 +138,7 @@ async fn should_return_409_if_email_already_exists() {
     let response = app
         .signup(&serde_json::json!({
             "email": random_email,
-            "password": "password123",
+            "password": "validPass123!",
             "requires2FA": true,
         }))
         .await;
@@ -126,7 +152,7 @@ async fn should_return_409_if_email_already_exists() {
     let response = app
         .signup(&serde_json::json!({
             "email": random_email,
-            "password": "password123",
+            "password": "validPass123!",
             "requires2FA": true,
         }))
         .await;
