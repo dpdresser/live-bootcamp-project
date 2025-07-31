@@ -13,4 +13,5 @@ async fn main() {
         .expect("Failed to build application");
 
     app.run().await.expect("Failed to run application");
+    println!("🚀 Auth Service starting up! Version: 2024-07-31");
 }
