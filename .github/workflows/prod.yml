@@ -54,17 +54,15 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Build and push Docker images
-      run: |
-        # Build and push auth-service
-        cd auth-service
-        docker build --no-cache -t ddresser05/auth-service:latest .
-        docker push ddresser05/auth-service:latest
-        cd ..
-        
-        # Build and push app-service  
-        cd app-service
-        docker build --no-cache -t ddresser05/app-service:latest .
-        docker push ddresser05/app-service:latest
+      uses: docker/bake-action@v2.3.0
+      with:
+        push: true
+        files: |
+          compose.yml
+          compose.override.yml
+        set: |
+          *.cache-from=type=gha
+          *.cache-to=type=gha,mode=max
 
   deploy:
     needs: build
@@ -99,7 +97,16 @@ jobs:
           cd ~
           echo "AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}" > .env
           echo "CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}" >> .env
-          docker compose down
-          docker volume rm root_webroot || true
-          docker compose pull
-          docker compose --profile prod up -d
+          
+          # Stop all containers first
+          docker compose --profile prod down --remove-orphans
+          
+          # Force remove the cached images
+          docker rmi -f ddresser05/auth-service:latest || true
+          docker rmi -f ddresser05/app-service:latest || true
+          
+          # Pull fresh images (now guaranteed to download since we removed them)
+          docker compose --profile prod pull
+          
+          # Start with fresh containers
+          docker compose --profile prod up -d --force-recreate
