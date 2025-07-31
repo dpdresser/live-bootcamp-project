@@ -36,11 +36,13 @@ jobs:
       run: |
         cargo build --verbose
         cargo test --verbose
+
     - name: Build and test auth-service code
       working-directory: ./auth-service
       run: |
         cargo build --verbose
         cargo test --verbose
+
       # Set up Docker Buildx for multi-platform builds
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
@@ -61,6 +63,7 @@ jobs:
         set: |
           *.cache-from=type=gha
           *.cache-to=type=gha,mode=max
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -81,20 +84,19 @@ jobs:
     - name: Copy compose.yml to droplet
       run: sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:~
 
-    - name: Copy nginx configuration to droplet
+    - name: Copy nginx.conf to droplet
       run: sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no nginx.conf root@${{ vars.DROPLET_IP }}:~
 
     - name: Deploy
-      uses: appleboy/ssh-action@v1.0.3
+      uses: appleboy/ssh-action@master
       with:
         host: ${{ vars.DROPLET_IP }}
         username: root
         password: ${{ secrets.DROPLET_PASSWORD }}
         script: |
           cd ~
-          echo "AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}" > .env
-          echo "CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}" >> .env
+          export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
+          export CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}
           docker compose down
-          docker volume rm root_webroot || true
           docker compose pull
           docker compose up -d
