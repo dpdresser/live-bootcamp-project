@@ -84,19 +84,20 @@ jobs:
     - name: Copy compose.yml to droplet
       run: sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:~
 
-    - name: Copy nginx.conf to droplet
+    - name: Copy nginx configuration to droplet
       run: sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no nginx.conf root@${{ vars.DROPLET_IP }}:~
 
     - name: Deploy
-      uses: appleboy/ssh-action@master
+      uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ vars.DROPLET_IP }}
         username: root
         password: ${{ secrets.DROPLET_PASSWORD }}
         script: |
           cd ~
-          export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
-          export CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}
+          echo "AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}" > .env
+          echo "CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}" >> .env
           docker compose down
-          docker compose -profile prod pull
-          docker compose -profile prod up -d
+          docker volume rm root_webroot || true
+          docker compose pull
+          docker compose --profile prod up -d
