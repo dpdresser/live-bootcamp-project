@@ -54,15 +54,17 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Build and push Docker images
-      uses: docker/bake-action@v2.3.0
-      with:
-        push: true
-        files: |
-          compose.yml
-          compose.override.yml
-        set: |
-          *.cache-from=type=gha
-          *.cache-to=type=gha,mode=max
+      run: |
+        # Build and push auth-service
+        cd auth-service
+        docker build --no-cache -t ddresser05/auth-service:latest .
+        docker push ddresser05/auth-service:latest
+        cd ..
+        
+        # Build and push app-service  
+        cd app-service
+        docker build --no-cache -t ddresser05/app-service:latest .
+        docker push ddresser05/app-service:latest
 
   deploy:
     needs: build
