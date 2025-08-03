@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::domain::{Email, Password, User, UserStore, UserStoreError};
+use crate::domain::{Email, User, UserStore, UserStoreError};
 
 #[derive(Default)]
 pub struct HashMapUserStore {
@@ -23,9 +23,9 @@ impl UserStore for HashMapUserStore {
             .ok_or(UserStoreError::UserNotFound)
     }
 
-    async fn validate_user(&self, email: Email, password: Password) -> Result<(), UserStoreError> {
+    async fn validate_user(&self, email: Email, password: &str) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
-        if user.password() == password.as_ref() {
+        if user.password() == password {
             Ok(())
         } else {
             Err(UserStoreError::InvalidCredentials)
@@ -36,6 +36,7 @@ impl UserStore for HashMapUserStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::Password;
 
     #[tokio::test]
     async fn test_add_user() {
@@ -75,10 +76,7 @@ mod tests {
         );
         store.add_user(user).await.unwrap();
         assert!(store
-            .validate_user(
-                Email::parse("test@example.com").unwrap(),
-                Password::parse("password123!").unwrap()
-            )
+            .validate_user(Email::parse("test@example.com").unwrap(), "password123!")
             .await
             .is_ok());
     }

@@ -1,4 +1,4 @@
-use crate::domain::{Email, Password};
+use crate::domain::Email;
 
 use super::User;
 
@@ -8,7 +8,7 @@ pub trait UserStore {
 
     async fn get_user(&self, email: Email) -> Result<&User, UserStoreError>;
 
-    async fn validate_user(&self, email: Email, password: Password) -> Result<(), UserStoreError>;
+    async fn validate_user(&self, email: Email, password: &str) -> Result<(), UserStoreError>;
 }
 
 #[derive(Debug, PartialEq)]

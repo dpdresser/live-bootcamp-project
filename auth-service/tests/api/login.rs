@@ -42,7 +42,12 @@ async fn should_return_400_if_invalid_input() {
 
     for case in test_cases {
         let response = app.login(&case).await;
-        assert_eq!(response.status().as_u16(), 400);
+        assert_eq!(
+            response.status().as_u16(),
+            400,
+            "Failed for input: {:?}",
+            case
+        );
     }
 }
 
