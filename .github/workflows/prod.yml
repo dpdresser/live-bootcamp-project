@@ -96,9 +96,8 @@ jobs:
         password: ${{ secrets.DROPLET_PASSWORD }}
         script: |
           cd ~
-          # github-actions-disable-next-line
-          export JWT_SECRET=${{ secrets.JWT_SECRET }} 
-          echo "AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}" > .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" > .env
+          echo "AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}" >> .env
           echo "CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}" >> .env
           
           # Stop all containers first
