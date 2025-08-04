@@ -17,13 +17,13 @@ impl UserStore for HashMapUserStore {
         Ok(())
     }
 
-    async fn get_user(&self, email: Email) -> Result<&User, UserStoreError> {
+    async fn get_user(&self, email: &Email) -> Result<&User, UserStoreError> {
         self.users
             .get(email.as_ref())
             .ok_or(UserStoreError::UserNotFound)
     }
 
-    async fn validate_user(&self, email: Email, password: &str) -> Result<(), UserStoreError> {
+    async fn validate_user(&self, email: &Email, password: &str) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
         if user.password() == password {
             Ok(())
@@ -60,7 +60,7 @@ mod tests {
         );
         store.add_user(user).await.unwrap();
         let retrieved_user = store
-            .get_user(Email::parse("test@example.com").unwrap())
+            .get_user(&Email::parse("test@example.com").unwrap())
             .await
             .unwrap();
         assert_eq!(retrieved_user.email(), "test@example.com");
@@ -76,7 +76,7 @@ mod tests {
         );
         store.add_user(user).await.unwrap();
         assert!(store
-            .validate_user(Email::parse("test@example.com").unwrap(), "password123!")
+            .validate_user(&Email::parse("test@example.com").unwrap(), "password123!")
             .await
             .is_ok());
     }

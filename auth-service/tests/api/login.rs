@@ -1,4 +1,4 @@
-use auth_service::ErrorResponse;
+use auth_service::{utils::JWT_COOKIE_NAME, ErrorResponse};
 
 use crate::helpers::{get_random_email, TestApp};
 
@@ -83,5 +83,41 @@ async fn should_return_401_if_incorrect_credentials() {
             .expect("Could not deserialize response body to ErrorResponse")
             .error,
         "Incorrect credentials".to_string(),
+    );
+}
+
+#[tokio::test]
+async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
+    let app = TestApp::new().await;
+
+    let email = get_random_email();
+
+    let response = app
+        .signup(&serde_json::json!({
+            "email": email,
+            "password": "validPass123!",
+            "requires2FA": false,
+        }))
+        .await;
+
+    assert_eq!(response.status().as_u16(), 201);
+
+    let response = app
+        .login(&serde_json::json!({
+            "email": email,
+            "password": "validPass123!",
+        }))
+        .await;
+
+    assert_eq!(response.status().as_u16(), 200);
+
+    let auth_cookie = response
+        .cookies()
+        .find(|c| c.name() == JWT_COOKIE_NAME)
+        .expect("No auth cookie found");
+
+    assert!(
+        !auth_cookie.value().is_empty(),
+        "Auth cookie should not be empty"
     );
 }
