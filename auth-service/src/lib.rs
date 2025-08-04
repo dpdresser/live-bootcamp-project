@@ -26,11 +26,11 @@ impl Application {
     pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
         let allowed_origins = [
             "http://localhost:8000".parse()?,
-            "https://lgr.ddrcode.me/app".parse()?,
+            "https://lgr.ddrcode.me".parse()?,
         ];
 
         let cors = CorsLayer::new()
-            .allow_methods([Method::GET, Method::POST])
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_credentials(true)
             .allow_origin(allowed_origins);
 
