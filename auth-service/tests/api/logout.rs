@@ -71,6 +71,24 @@ async fn should_return_200_if_valid_jwt_cookie() {
         "Auth cookie should not be empty"
     );
 
+    // Extract the JWT token value before logout
+    let jwt_token = auth_cookie.value().to_string();
+
+    // Verify token is not banned before logout
+    let is_banned_before = app
+        .app_state
+        .banned_token_store
+        .read()
+        .await
+        .is_token_banned(&jwt_token)
+        .await
+        .expect("Failed to check if token is banned");
+
+    assert!(
+        !is_banned_before,
+        "Token should not be banned before logout"
+    );
+
     let response = app.logout().await;
 
     assert_eq!(response.status().as_u16(), 200);
@@ -84,6 +102,18 @@ async fn should_return_200_if_valid_jwt_cookie() {
         logout_cookie.value().is_empty(),
         "Auth cookie should be empty after logout"
     );
+
+    // Verify the JWT token was added to the banned token store
+    let is_banned_after = app
+        .app_state
+        .banned_token_store
+        .read()
+        .await
+        .is_token_banned(&jwt_token)
+        .await
+        .expect("Failed to check if token is banned");
+
+    assert!(is_banned_after, "Token should be banned after logout");
 }
 
 #[tokio::test]
