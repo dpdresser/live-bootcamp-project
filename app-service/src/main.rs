@@ -32,12 +32,9 @@ struct IndexTemplate {
 }
 
 async fn root() -> impl IntoResponse {
-    let mut address = env::var("AUTH_SERVICE_IP").unwrap_or("localhost".to_owned());
-    if address.is_empty() {
-        address = "localhost".to_owned();
-    }
-    let login_link = format!("https://{}:3000", address);
-    let logout_link = format!("https://{}:3000/logout", address);
+    // Use relative paths that work with nginx proxy
+    let login_link = "/auth".to_string();
+    let logout_link = "/logout".to_string();
 
     let template = IndexTemplate {
         login_link,
