@@ -32,10 +32,16 @@ struct IndexTemplate {
 }
 
 async fn root() -> impl IntoResponse {
-    // For local development, point to auth-service directly
-    // In production, nginx will handle the routing
-    let login_link = "http://localhost:3000".to_string();
-    let logout_link = "http://localhost:3000/logout".to_string();
+    // Check if we're in production (has AUTH_SERVICE_HOST_NAME env var) or local development
+    let auth_hostname = env::var("AUTH_SERVICE_HOST_NAME").unwrap_or_default();
+    
+    let (login_link, logout_link) = if auth_hostname.is_empty() {
+        // Local development - point directly to auth-service
+        ("http://localhost:3000".to_string(), "http://localhost:3000/logout".to_string())
+    } else {
+        // Production - use relative paths that work with nginx proxy
+        ("/auth".to_string(), "/logout".to_string())
+    };
 
     let template = IndexTemplate {
         login_link,
