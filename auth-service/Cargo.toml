@@ -13,6 +13,7 @@ chrono = "0.4.35"
 dotenvy = "0.15.7"
 jsonwebtoken = "9.2.0"
 lazy_static = "1.4.0"
+rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.36", features = ["full"] }

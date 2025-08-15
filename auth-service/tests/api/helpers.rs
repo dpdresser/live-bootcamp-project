@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use auth_service::{
     app_state::AppState,
-    services::{HashMapUserStore, HashSetBannedTokenStore},
+    services::{HashMapTwoFACodeStore, HashMapUserStore, HashSetBannedTokenStore, MockEmailClient},
     utils::test,
     Application,
 };
@@ -20,7 +20,14 @@ impl TestApp {
     pub async fn new() -> Self {
         let user_store = Arc::new(RwLock::new(HashMapUserStore::default()));
         let banned_token_store = Arc::new(RwLock::new(HashSetBannedTokenStore::default()));
-        let app_state = AppState::new(user_store, banned_token_store);
+        let two_fa_code_store = Arc::new(RwLock::new(HashMapTwoFACodeStore::default()));
+        let email_client = Arc::new(RwLock::new(MockEmailClient));
+        let app_state = AppState::new(
+            user_store,
+            banned_token_store,
+            two_fa_code_store,
+            email_client,
+        );
 
         let app = Application::build(app_state.clone(), test::APP_ADDRESS)
             .await
@@ -85,9 +92,13 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
-    pub async fn verify_2fa(&self) -> reqwest::Response {
+    pub async fn verify_2fa<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
         self.http_client
             .post(format!("{}/verify-2fa", &self.address))
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request")

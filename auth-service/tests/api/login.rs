@@ -1,4 +1,6 @@
-use auth_service::{utils::JWT_COOKIE_NAME, ErrorResponse};
+use auth_service::{
+    domain::Email, routes::TwoFactorAuthResponse, utils::JWT_COOKIE_NAME, ErrorResponse,
+};
 
 use crate::helpers::{get_random_email, TestApp};
 
@@ -120,4 +122,50 @@ async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
         !auth_cookie.value().is_empty(),
         "Auth cookie should not be empty"
     );
+}
+
+#[tokio::test]
+async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
+    let app = TestApp::new().await;
+
+    let email = get_random_email();
+
+    let response = app
+        .signup(&serde_json::json!({
+            "email": email,
+            "password": "validPass123!",
+            "requires2FA": true,
+        }))
+        .await;
+
+    assert_eq!(response.status().as_u16(), 201);
+
+    let response = app
+        .login(&serde_json::json!({
+            "email": email,
+            "password": "validPass123!",
+        }))
+        .await;
+
+    assert_eq!(response.status().as_u16(), 206);
+
+    let json_body = response
+        .json::<TwoFactorAuthResponse>()
+        .await
+        .expect("Failed to deserialize response body");
+
+    assert_eq!(
+        json_body.message,
+        "2FA required".to_string(),
+        "Unexpected message in 2FA response"
+    );
+
+    assert!(app
+        .app_state
+        .two_fa_code_store
+        .read()
+        .await
+        .get_code(&Email::parse(&email).unwrap())
+        .await
+        .is_ok());
 }
