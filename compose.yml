@@ -17,11 +17,24 @@ services:
     profiles: ["prod", "dev"]
     restart: "always"
     environment:
-      JWT_SECRET: ${JWT_SECRET}  # Fix: Remove the array syntax
+      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: "postgres://postgres:${POSTGRES_PASSWORD}@db:5432"
     ports:
       - "3000:3000"
+    depends_on:
+      - db
     networks:
       - app-network
+  db:
+    image: postgres:15.2-alpine
+    profiles: ["prod", "dev"]
+    restart: "always"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db:/var/lib/postgresql/data
   webserver:
     image: nginx:latest # use the latest version of nginx
     profiles: ["prod"]
@@ -59,6 +72,8 @@ volumes:
   certbot-etc:
   certbot-var:
   webroot:
+  db:
+    driver: local
 networks:
   app-network:
     driver: bridge

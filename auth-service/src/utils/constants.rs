@@ -15,8 +15,22 @@ fn set_token() -> String {
     secret
 }
 
+lazy_static::lazy_static! {
+    pub static ref DB_URL: String = set_db_url();
+}
+
+fn set_db_url() -> String {
+    dotenv().ok();
+    let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set in environment");
+    if db_url.is_empty() {
+        panic!("DATABASE_URL is empty");
+    }
+    db_url
+}
+
 pub mod env {
     pub const JWT_SECRET_ENV_VAR: &str = "JWT_SECRET";
+    pub const DATABASE_URL_ENV_VAR: &str = "DATABASE_URL";
 }
 
 pub mod prod {
