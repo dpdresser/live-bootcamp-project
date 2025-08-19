@@ -34,6 +34,8 @@ services:
       - "5432:5432"
     volumes:
       - db:/var/lib/postgresql/data
+    networks:
+      - app-network
   webserver:
     image: nginx:latest # use the latest version of nginx
     profiles: ["prod"]
