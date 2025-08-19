@@ -5,7 +5,7 @@ use crate::helpers::{get_random_email, TestApp};
 
 #[tokio::test]
 async fn should_return_400_if_jwt_cookie_missing() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let response = app.logout().await;
 
@@ -17,11 +17,13 @@ async fn should_return_400_if_jwt_cookie_missing() {
         .expect("Could not deserialize response body to ErrorResponse");
 
     assert_eq!(error_response.error, "Missing token");
+
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_invalid_token() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     app.cookie_jar.add_cookie_str(
         &format!(
@@ -34,11 +36,13 @@ async fn should_return_401_if_invalid_token() {
     let response = app.logout().await;
 
     assert_eq!(response.status().as_u16(), 401);
+
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn should_return_200_if_valid_jwt_cookie() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let email = get_random_email();
 
@@ -114,11 +118,13 @@ async fn should_return_200_if_valid_jwt_cookie() {
         .expect("Failed to check if token is banned");
 
     assert!(is_banned_after, "Token should be banned after logout");
+
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn should_return_400_if_logout_called_twice_in_a_row() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let email = get_random_email();
 
@@ -175,4 +181,6 @@ async fn should_return_400_if_logout_called_twice_in_a_row() {
         .expect("Could not deserialize response body to ErrorResponse");
 
     assert_eq!(error_response.error, "Missing token");
+
+    app.cleanup().await;
 }
