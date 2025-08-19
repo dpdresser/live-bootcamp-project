@@ -27,8 +27,7 @@ services:
       - app-network
   db:
     image: postgres:15.2-alpine
-    profiles: ["prod", "dev"]
-    restart: "always"
+    restart: always
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:

@@ -17,10 +17,14 @@ impl UserStore for HashMapUserStore {
         Ok(())
     }
 
-    async fn get_user(&self, email: &Email) -> Result<&User, UserStoreError> {
-        self.users
+    async fn get_user(&self, email: &Email) -> Result<User, UserStoreError> {
+        let user = self
+            .users
             .get(email.as_ref())
-            .ok_or(UserStoreError::UserNotFound)
+            .ok_or(UserStoreError::UserNotFound)?
+            .clone();
+
+        Ok(user)
     }
 
     async fn validate_user(&self, email: &Email, password: &str) -> Result<(), UserStoreError> {
