@@ -1,3 +1,4 @@
+use color_eyre::eyre::{eyre, Result};
 use validator::Validate;
 
 #[derive(Debug, Clone, Validate, Hash, Eq, PartialEq)]
@@ -13,14 +14,14 @@ impl AsRef<str> for Email {
 }
 
 impl Email {
-    pub fn parse(email: &str) -> Result<Self, String> {
+    pub fn parse(email: &str) -> Result<Self> {
         let email_struct = Self {
             email: email.to_string(),
         };
 
         match email_struct.validate() {
             Ok(_) => Ok(email_struct),
-            Err(errors) => Err(format!("Invalid email format: {errors:?}")),
+            Err(errors) => Err(eyre!("Invalid email format: {errors:?}")),
         }
     }
 }

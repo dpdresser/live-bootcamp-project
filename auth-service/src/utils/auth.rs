@@ -1,4 +1,5 @@
 use axum_extra::extract::cookie::{Cookie, SameSite};
+use color_eyre::eyre::{eyre, Context, ContextCompat, Result};
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
@@ -7,11 +8,13 @@ use crate::{
     utils::{JWT_COOKIE_NAME, JWT_SECRET},
 };
 
-pub fn generate_auth_cookie(email: &Email) -> Result<Cookie<'static>, GenerateTokenError> {
+#[tracing::instrument(name = "Generate Auth Cookie", skip_all)]
+pub fn generate_auth_cookie(email: &Email) -> Result<Cookie<'static>> {
     let token = generate_auth_token(email)?;
     Ok(create_auth_cookie(token))
 }
 
+#[tracing::instrument(name = "Create Auth Cookie", skip_all)]
 fn create_auth_cookie(token: String) -> Cookie<'static> {
     Cookie::build((JWT_COOKIE_NAME, token))
         .path("/")
@@ -20,26 +23,21 @@ fn create_auth_cookie(token: String) -> Cookie<'static> {
         .build()
 }
 
-#[derive(Debug)]
-pub enum GenerateTokenError {
-    TokenError(jsonwebtoken::errors::Error),
-    UnexpectedError,
-}
-
 pub const TOKEN_TTL_SECONDS: i64 = 600; // 10 minutes
 
-fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
+#[tracing::instrument(name = "Generate Auth Token", skip_all)]
+fn generate_auth_token(email: &Email) -> Result<String> {
     let delta = chrono::Duration::try_seconds(TOKEN_TTL_SECONDS)
-        .ok_or(GenerateTokenError::UnexpectedError)?;
+        .wrap_err("Failed to create 10 minute time delta")?;
 
     let expiration = chrono::Utc::now()
         .checked_add_signed(delta)
-        .ok_or(GenerateTokenError::UnexpectedError)?
+        .ok_or(eyre!("Failed to add time delta to current time"))?
         .timestamp();
 
     let expiration: usize = expiration
         .try_into()
-        .map_err(|_| GenerateTokenError::UnexpectedError)?;
+        .wrap_err("Failed to convert expiration to usize")?;
 
     let sub = email.as_ref().to_string();
 
@@ -48,24 +46,28 @@ fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
         exp: expiration,
     };
 
-    create_token(&claims).map_err(GenerateTokenError::TokenError)
+    create_token(&claims)
 }
 
-pub async fn validate_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+#[tracing::instrument(name = "Validate Token", skip_all)]
+pub async fn validate_token(token: &str) -> Result<Claims> {
     decode::<Claims>(
         token,
         &DecodingKey::from_secret(JWT_SECRET.as_bytes()),
         &Validation::default(),
     )
     .map(|data| data.claims)
+    .map_err(|e| eyre!("Token validation error: {}", e))
 }
 
-fn create_token(claims: &Claims) -> Result<String, jsonwebtoken::errors::Error> {
+#[tracing::instrument(name = "Create Token", skip_all)]
+fn create_token(claims: &Claims) -> Result<String> {
     jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
         claims,
         &jsonwebtoken::EncodingKey::from_secret(JWT_SECRET.as_bytes()),
     )
+    .map_err(|e| eyre!("Failed to create token: {}", e))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -115,6 +117,7 @@ mod tests {
     async fn test_validate_token_with_valid_token() {
         let email = Email::parse("test@example.com").unwrap();
         let token = generate_auth_token(&email).unwrap();
+
         let result = validate_token(&token).await.unwrap();
         assert_eq!(result.sub, "test@example.com");
 

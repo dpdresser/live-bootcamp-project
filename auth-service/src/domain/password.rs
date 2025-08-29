@@ -1,3 +1,5 @@
+use color_eyre::eyre::{eyre, Result};
+
 #[derive(Debug, Clone)]
 pub struct Password {
     password: String,
@@ -10,17 +12,17 @@ impl AsRef<str> for Password {
 }
 
 impl Password {
-    pub fn parse(password: &str) -> Result<Self, String> {
+    pub fn parse(password: &str) -> Result<Self> {
         if password.len() < 8 {
-            return Err("Password must be at least 8 characters long".to_string());
+            return Err(eyre!("Password must be at least 8 characters long"));
         }
 
         if !password.chars().any(|c| c.is_ascii_digit()) {
-            return Err("Password must contain at least 1 number".to_string());
+            return Err(eyre!("Password must contain at least 1 number"));
         }
 
         if !password.chars().any(|c| !c.is_alphanumeric()) {
-            return Err("Password must contain at least 1 special character".to_string());
+            return Err(eyre!("Password must contain at least 1 special character"));
         }
 
         Ok(Self {
@@ -71,7 +73,10 @@ mod tests {
                 "Expected '{}' to be invalid due to length",
                 password
             );
-            assert!(result.unwrap_err().contains("at least 8 characters"));
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains("at least 8 characters"));
         }
     }
 
@@ -92,7 +97,10 @@ mod tests {
                 "Expected '{}' to be invalid due to missing number",
                 password
             );
-            assert!(result.unwrap_err().contains("at least 1 number"));
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains("at least 1 number"));
         }
     }
 
@@ -113,7 +121,10 @@ mod tests {
                 "Expected '{}' to be invalid due to missing special character",
                 password
             );
-            assert!(result.unwrap_err().contains("at least 1 special character"));
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains("at least 1 special character"));
         }
     }
 
@@ -129,7 +140,10 @@ mod tests {
         for (password, expected_error_part) in invalid_passwords {
             let result = Password::parse(password);
             assert!(result.is_err(), "Expected '{}' to be invalid", password);
-            assert!(result.unwrap_err().contains(expected_error_part));
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains(expected_error_part));
         }
     }
 

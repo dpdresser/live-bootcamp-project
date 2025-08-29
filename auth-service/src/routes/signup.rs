@@ -6,7 +6,7 @@ use crate::{
     domain::{AuthAPIError, Email, Password, User, UserStoreError},
 };
 
-#[tracing::instrument(name = "Signup", skip_all, err(Debug))]
+#[tracing::instrument(name = "Signup", skip_all)]
 pub async fn signup(
     State(state): State<AppState>,
     Json(request): Json<SignupRequest>,
@@ -25,7 +25,7 @@ pub async fn signup(
             Ok((StatusCode::CREATED, response))
         }
         Err(UserStoreError::UserAlreadyExists) => Err(AuthAPIError::UserAlreadyExists),
-        _ => Err(AuthAPIError::UnexpectedError),
+        Err(e) => Err(AuthAPIError::UnexpectedError(e.into())),
     }
 }
 

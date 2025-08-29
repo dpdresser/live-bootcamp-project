@@ -1,8 +1,8 @@
-use std::error::Error;
-
 use argon2::{
-    password_hash::SaltString, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier,
+    password_hash::SaltString, Algorithm, Argon2, Params, PasswordHash, PasswordHasher,
+    PasswordVerifier, Version,
 };
+use color_eyre::eyre::{eyre, Context, Result};
 use sqlx::PgPool;
 
 use crate::domain::{Email, Password, User, UserStore, UserStoreError};
@@ -23,7 +23,7 @@ impl UserStore for PostgresUserStore {
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
         let password_hash = compute_password_hash(user.password().to_string())
             .await
-            .map_err(|_| UserStoreError::UnexpectedError)?;
+            .map_err(UserStoreError::UnexpectedError)?;
 
         let email_str: &str = user.email();
         let password_hash_str: &str = password_hash.as_ref();
@@ -49,8 +49,9 @@ impl UserStore for PostgresUserStore {
             .map_err(|_| UserStoreError::UserNotFound)?;
 
         let user = User::new(
-            Email::parse(&row.email).map_err(|_| UserStoreError::UnexpectedError)?,
-            Password::parse(&row.password_hash).map_err(|_| UserStoreError::UnexpectedError)?,
+            Email::parse(&row.email).map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
+            Password::parse(&row.password_hash)
+                .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
             row.requires_2fa,
         );
 
@@ -74,39 +75,45 @@ impl UserStore for PostgresUserStore {
 async fn verify_password_hash(
     expected_password_hash: String,
     password_candidate: String,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    tokio::task::spawn_blocking(move || {
-        // Parse the password hash
-        let expected_password_hash = PasswordHash::new(&expected_password_hash)
-            .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?;
+) -> Result<()> {
+    let current_span: tracing::Span = tracing::Span::current();
 
-        // Verify the password
-        Argon2::default()
-            .verify_password(password_candidate.as_bytes(), &expected_password_hash)
-            .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?;
+    let result = tokio::task::spawn_blocking(move || {
+        current_span.in_scope(|| {
+            let expected_password_hash: PasswordHash<'_> =
+                PasswordHash::new(&expected_password_hash)?;
 
-        Ok(())
+            Argon2::default()
+                .verify_password(password_candidate.as_bytes(), &expected_password_hash)
+                .wrap_err("Failed to verify password hash")
+        })
     })
-    .await
-    .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?
+    .await;
+
+    result?
 }
 
 // Helper function to hash passwords before persisting them in the database
 #[tracing::instrument(name = "Computing password hash", skip_all)]
-async fn compute_password_hash(password: String) -> Result<String, Box<dyn Error + Send + Sync>> {
-    tokio::task::spawn_blocking(move || {
-        let salt: SaltString = SaltString::generate(&mut rand::thread_rng());
+async fn compute_password_hash(password: String) -> Result<String> {
+    let current_span: tracing::Span = tracing::Span::current();
 
-        let password_hash = Argon2::new(
-            argon2::Algorithm::Argon2id,
-            argon2::Version::V0x13,
-            Params::new(15000, 2, 1, None)?,
-        )
-        .hash_password(password.as_bytes(), &salt)?
-        .to_string();
+    let result = tokio::task::spawn_blocking(move || {
+        current_span.in_scope(|| {
+            let salt: SaltString = SaltString::generate(&mut rand::thread_rng());
 
-        Ok(password_hash)
+            let password_hash = Argon2::new(
+                Algorithm::Argon2id,
+                Version::V0x13,
+                Params::new(15000, 2, 1, None)?,
+            )
+            .hash_password(password.as_bytes(), &salt)?
+            .to_string();
+
+            Ok(password_hash)
+        })
     })
-    .await
-    .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?
+    .await;
+
+    result?
 }

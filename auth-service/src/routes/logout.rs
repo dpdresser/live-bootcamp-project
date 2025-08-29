@@ -28,7 +28,7 @@ pub async fn logout(
         .await
         .add_token(&token)
         .await
-        .map_err(|_| AuthAPIError::UnexpectedError)?;
+        .map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
 
     // Remove the cookie and return success
     let updated_jar = jar.remove(crate::utils::JWT_COOKIE_NAME);

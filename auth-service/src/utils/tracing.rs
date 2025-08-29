@@ -1,14 +1,30 @@
 use std::time::Duration;
 
 use axum::{body::Body, extract::Request, response::Response};
+use color_eyre::eyre::Result;
 use tracing::{Level, Span};
+use tracing_error::ErrorLayer;
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use uuid::Uuid;
 
-pub fn init_tracing() {
-    tracing_subscriber::fmt()
-        .compact()
-        .with_max_level(tracing::Level::DEBUG)
+pub fn init_tracing() -> Result<()> {
+    // Create formatting layer for tracing output
+    let fmt_layer = fmt::layer().compact();
+
+    // Create filter layer to control verbosity of logs
+    // Get filter config from environment variables
+    // If fails, defaults to "info" log level
+    let filter_layer = EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info"))?;
+
+    // Build the tracing subscriber registery with the formatting layer,
+    // filter layer, and the error layer for enhanced error reporting
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt_layer)
+        .with(ErrorLayer::default())
         .init();
+
+    Ok(())
 }
 
 // Creates a new tacing span with a unique request ID for each incoming request.
@@ -20,7 +36,7 @@ pub fn make_span_with_request_id(request: &Request<Body>) -> Span {
         "[REQUEST]",
         method = tracing::field::display(request.method()),
         uri = tracing::field::display(request.uri()),
-        version = tracing::field::display(format!("{:?}", request.version())),
+        version = tracing::field::debug(request.version()),
         request_id = tracing::field::display(request_id),
     )
 }
