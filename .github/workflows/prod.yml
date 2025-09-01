@@ -118,6 +118,7 @@ jobs:
           echo "AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}" >> .env
           echo "CERTBOT_EMAIL=${{ vars.CERTBOT_EMAIL }}" >> .env
           echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> .env
+          echo "POSTMARK_AUTH_TOKEN=${{ secrets.POSTMARK_AUTH_TOKEN }}" >> .env
           
           # Stop all containers first
           docker compose --profile prod down --remove-orphans

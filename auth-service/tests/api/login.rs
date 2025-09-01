@@ -1,8 +1,8 @@
+use crate::helpers::{get_random_email, TestApp};
 use auth_service::{
     domain::Email, routes::TwoFactorAuthResponse, utils::JWT_COOKIE_NAME, ErrorResponse,
 };
-
-use crate::helpers::{get_random_email, TestApp};
+use secrecy::ExposeSecret;
 
 #[tokio::test]
 async fn should_return_422_if_malformed_credentials() {
@@ -176,6 +176,192 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
         .get_code(&Email::parse(&email).unwrap())
         .await
         .is_ok());
+
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn should_return_401_if_incorrect_credentials_and_2fa() {
+    let mut app = TestApp::new().await;
+    let email = get_random_email();
+
+    // Sign up a user with 2FA enabled
+    let signup_body = serde_json::json!({
+        "email": email,
+        "password": "correctPassword123!",
+        "requires2FA": true,
+    });
+
+    let response = app.signup(&signup_body).await;
+    assert_eq!(response.status().as_u16(), 201);
+
+    // Try to login with incorrect password - no email should be sent
+    let login_body = serde_json::json!({
+        "email": email,
+        "password": "wrongPassword123!",
+    });
+
+    let response = app.login(&login_body).await;
+    assert_eq!(response.status().as_u16(), 401);
+
+    let json_body = response
+        .json::<ErrorResponse>()
+        .await
+        .expect("Failed to deserialize response body");
+
+    assert_eq!(json_body.error, "Incorrect credentials");
+
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn should_return_401_if_old_code() {
+    use wiremock::{
+        matchers::{method, path},
+        Mock, ResponseTemplate,
+    };
+
+    let mut app = TestApp::new().await;
+    let email = get_random_email();
+
+    // Sign up a user with 2FA enabled
+    let signup_body = serde_json::json!({
+        "email": email,
+        "password": "validPassword123!",
+        "requires2FA": true,
+    });
+
+    let response = app.signup(&signup_body).await;
+    assert_eq!(response.status().as_u16(), 201);
+
+    // Set up email mock expectation for first login
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
+
+    // First login to generate a 2FA code
+    let login_body = serde_json::json!({
+        "email": email,
+        "password": "validPassword123!",
+    });
+
+    let response = app.login(&login_body).await;
+    assert_eq!(response.status().as_u16(), 206);
+
+    // Get the first 2FA code
+    let email_obj = Email::parse(&email).unwrap();
+    let first_code = app
+        .app_state
+        .two_fa_code_store
+        .read()
+        .await
+        .get_code(&email_obj)
+        .await
+        .expect("Failed to get 2FA code");
+
+    // Wait a moment to ensure time difference
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Set up email mock expectation for second login
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
+
+    // Login again to generate a new 2FA code
+    let response = app.login(&login_body).await;
+    assert_eq!(response.status().as_u16(), 206);
+
+    // Try to verify with the old code
+    let verify_body = serde_json::json!({
+        "email": email,
+        "loginAttemptId": first_code.0.as_ref().expose_secret(),
+        "2FACode": first_code.1.as_ref().expose_secret(),
+    });
+
+    let response = app.verify_2fa(&verify_body).await;
+    assert_eq!(response.status().as_u16(), 401);
+
+    let json_body = response
+        .json::<ErrorResponse>()
+        .await
+        .expect("Failed to deserialize response body");
+
+    assert_eq!(json_body.error, "Incorrect credentials");
+
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn should_return_401_if_same_code_twice() {
+    use wiremock::{
+        matchers::{method, path},
+        Mock, ResponseTemplate,
+    };
+
+    let mut app = TestApp::new().await;
+    let email = get_random_email();
+
+    // Sign up a user with 2FA enabled
+    let signup_body = serde_json::json!({
+        "email": email,
+        "password": "validPassword123!",
+        "requires2FA": true,
+    });
+
+    let response = app.signup(&signup_body).await;
+    assert_eq!(response.status().as_u16(), 201);
+
+    // Set up email mock expectation
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
+
+    // Login to generate a 2FA code
+    let login_body = serde_json::json!({
+        "email": email,
+        "password": "validPassword123!",
+    });
+
+    let response = app.login(&login_body).await;
+    assert_eq!(response.status().as_u16(), 206);
+
+    // Get the 2FA code
+    let email_obj = Email::parse(&email).unwrap();
+    let code = app
+        .app_state
+        .two_fa_code_store
+        .read()
+        .await
+        .get_code(&email_obj)
+        .await
+        .expect("Failed to get 2FA code");
+
+    // First verification (should succeed)
+    let verify_body = serde_json::json!({
+        "email": email,
+        "loginAttemptId": code.0.as_ref().expose_secret(),
+        "2FACode": code.1.as_ref().expose_secret(),
+    });
+
+    let response = app.verify_2fa(&verify_body).await;
+    assert_eq!(response.status().as_u16(), 200);
+
+    // Try to use the same code again (should fail)
+    let response = app.verify_2fa(&verify_body).await;
+    assert_eq!(response.status().as_u16(), 401);
+
+    let json_body = response
+        .json::<ErrorResponse>()
+        .await
+        .expect("Failed to deserialize response body");
+
+    assert_eq!(json_body.error, "Incorrect credentials");
 
     app.cleanup().await;
 }

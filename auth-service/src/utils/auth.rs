@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::Email,
-    utils::{JWT_COOKIE_NAME, JWT_SECRET},
+    utils::constants::{JWT_COOKIE_NAME, JWT_SECRET},
 };
 
 #[tracing::instrument(name = "Generate Auth Cookie", skip_all)]
