@@ -1,3 +1,5 @@
+use secrecy::Secret;
+
 use crate::domain::{Email, Password};
 
 #[derive(Clone)]
@@ -16,11 +18,11 @@ impl User {
         }
     }
 
-    pub fn email(&self) -> &str {
+    pub fn email(&self) -> &Secret<String> {
         self.email.as_ref()
     }
 
-    pub fn password(&self) -> &str {
+    pub fn password(&self) -> &Secret<String> {
         self.password.as_ref()
     }
 

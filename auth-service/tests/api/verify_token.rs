@@ -1,4 +1,5 @@
 use auth_service::utils::JWT_COOKIE_NAME;
+use secrecy::Secret;
 
 use crate::helpers::{get_random_email, TestApp};
 
@@ -146,7 +147,7 @@ async fn should_return_401_if_banned_token() {
         .banned_token_store
         .write()
         .await
-        .add_token(auth_cookie.value())
+        .add_token(&Secret::new(auth_cookie.value().to_string()))
         .await;
 
     let response = app

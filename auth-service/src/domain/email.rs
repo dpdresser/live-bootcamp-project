@@ -1,27 +1,40 @@
+use std::hash::{Hash, Hasher};
+
 use color_eyre::eyre::{eyre, Result};
-use validator::Validate;
+use secrecy::{ExposeSecret, Secret};
+use validator::validate_email;
 
-#[derive(Debug, Clone, Validate, Hash, Eq, PartialEq)]
-pub struct Email {
-    #[validate(email)]
-    email: String,
-}
+#[derive(Debug, Clone)]
+pub struct Email(Secret<String>);
 
-impl AsRef<str> for Email {
-    fn as_ref(&self) -> &str {
-        &self.email
+impl AsRef<Secret<String>> for Email {
+    fn as_ref(&self) -> &Secret<String> {
+        &self.0
     }
 }
 
+impl PartialEq for Email {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
+
+impl Hash for Email {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.expose_secret().hash(state);
+    }
+}
+
+impl Eq for Email {}
+
 impl Email {
     pub fn parse(email: &str) -> Result<Self> {
-        let email_struct = Self {
-            email: email.to_string(),
-        };
+        let email_struct = Self(Secret::new(email.to_string()));
 
-        match email_struct.validate() {
-            Ok(_) => Ok(email_struct),
-            Err(errors) => Err(eyre!("Invalid email format: {errors:?}")),
+        if validate_email(email_struct.0.expose_secret()) {
+            Ok(email_struct)
+        } else {
+            Err(eyre!("Invalid email format"))
         }
     }
 }
@@ -50,7 +63,7 @@ mod tests {
             );
 
             if let Ok(parsed_email) = result {
-                assert_eq!(parsed_email.as_ref(), email);
+                assert_eq!(parsed_email.as_ref().expose_secret(), email);
             }
         }
     }
@@ -82,6 +95,6 @@ mod tests {
     fn test_as_ref_implementation() {
         let email_str = "test@example.com";
         let email = Email::parse(email_str).unwrap();
-        assert_eq!(email.as_ref(), email_str);
+        assert_eq!(email.as_ref().expose_secret(), email_str);
     }
 }

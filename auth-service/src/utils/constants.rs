@@ -1,11 +1,12 @@
 use dotenvy::dotenv;
+use secrecy::Secret;
 
 pub const JWT_COOKIE_NAME: &str = "jwt";
 pub const DEFAULT_REDIS_HOSTNAME: &str = "127.0.0.1";
 
 lazy_static::lazy_static! {
-    pub static ref JWT_SECRET: String = set_token();
-    pub static ref DB_URL: String = set_db_url();
+    pub static ref JWT_SECRET: Secret<String> = Secret::new(set_token());
+    pub static ref DB_URL: Secret<String> = Secret::new(set_db_url());
     pub static ref REDIS_HOST_NAME: String = set_redis_host();
 }
 

@@ -3,6 +3,7 @@ use argon2::{
     PasswordVerifier, Version,
 };
 use color_eyre::eyre::{eyre, Context, Result};
+use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 
 use crate::domain::{Email, Password, User, UserStore, UserStoreError};
@@ -21,11 +22,11 @@ impl PostgresUserStore {
 impl UserStore for PostgresUserStore {
     #[tracing::instrument(name = "Adding user to PostgreSQL", skip_all)]
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
-        let password_hash = compute_password_hash(user.password().to_string())
+        let password_hash = compute_password_hash(user.password().expose_secret().to_string())
             .await
             .map_err(UserStoreError::UnexpectedError)?;
 
-        let email_str: &str = user.email();
+        let email_str: &str = user.email().expose_secret();
         let password_hash_str: &str = password_hash.as_ref();
 
         sqlx::query!(
@@ -43,14 +44,17 @@ impl UserStore for PostgresUserStore {
 
     #[tracing::instrument(name = "Retrieving user from PostgreSQL", skip_all)]
     async fn get_user(&self, email: &Email) -> Result<User, UserStoreError> {
-        let row = sqlx::query!("SELECT * FROM users WHERE email = $1", email.as_ref())
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|_| UserStoreError::UserNotFound)?;
+        let row = sqlx::query!(
+            "SELECT * FROM users WHERE email = $1",
+            email.as_ref().expose_secret()
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| UserStoreError::UserNotFound)?;
 
         let user = User::new(
             Email::parse(&row.email).map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
-            Password::parse(&row.password_hash)
+            Password::parse(&Secret::new(row.password_hash))
                 .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
             row.requires_2fa,
         );
@@ -62,9 +66,12 @@ impl UserStore for PostgresUserStore {
     async fn validate_user(&self, email: &Email, password: &str) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
 
-        verify_password_hash(user.password().to_string(), password.to_string())
-            .await
-            .map_err(|_| UserStoreError::InvalidCredentials)?;
+        verify_password_hash(
+            user.password().expose_secret().to_string(),
+            password.to_string(),
+        )
+        .await
+        .map_err(|_| UserStoreError::InvalidCredentials)?;
 
         Ok(())
     }

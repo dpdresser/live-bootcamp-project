@@ -1,5 +1,6 @@
 use auth_service::utils::JWT_COOKIE_NAME;
 use reqwest::Url;
+use secrecy::Secret;
 
 use crate::helpers::{get_random_email, TestApp};
 
@@ -76,7 +77,7 @@ async fn should_return_200_if_valid_jwt_cookie() {
     );
 
     // Extract the JWT token value before logout
-    let jwt_token = auth_cookie.value().to_string();
+    let jwt_token = Secret::new(auth_cookie.value().to_string());
 
     // Verify token is not banned before logout
     let is_banned_before = app

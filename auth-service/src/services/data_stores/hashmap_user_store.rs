@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use secrecy::ExposeSecret;
+
 use crate::domain::{Email, User, UserStore, UserStoreError};
 
 #[derive(Default)]
@@ -10,17 +12,18 @@ pub struct HashMapUserStore {
 #[async_trait::async_trait]
 impl UserStore for HashMapUserStore {
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
-        if self.users.contains_key(user.email()) {
+        if self.users.contains_key(user.email().expose_secret()) {
             return Err(UserStoreError::UserAlreadyExists);
         }
-        self.users.insert(user.email().to_owned(), user);
+        self.users
+            .insert(user.email().expose_secret().to_owned(), user);
         Ok(())
     }
 
     async fn get_user(&self, email: &Email) -> Result<User, UserStoreError> {
         let user = self
             .users
-            .get(email.as_ref())
+            .get(email.as_ref().expose_secret())
             .ok_or(UserStoreError::UserNotFound)?
             .clone();
 
@@ -29,7 +32,7 @@ impl UserStore for HashMapUserStore {
 
     async fn validate_user(&self, email: &Email, password: &str) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
-        if user.password() == password {
+        if user.password().expose_secret() == password {
             Ok(())
         } else {
             Err(UserStoreError::InvalidCredentials)
@@ -39,6 +42,8 @@ impl UserStore for HashMapUserStore {
 
 #[cfg(test)]
 mod tests {
+    use secrecy::Secret;
+
     use super::*;
     use crate::domain::Password;
 
@@ -47,7 +52,7 @@ mod tests {
         let mut store = HashMapUserStore::default();
         let user = User::new(
             Email::parse("test@example.com").unwrap(),
-            Password::parse("password123!").unwrap(),
+            Password::parse(&Secret::new("password123!".to_string())).unwrap(),
             false,
         );
         assert_eq!(store.add_user(user).await.unwrap(), ());
@@ -59,7 +64,7 @@ mod tests {
         let mut store = HashMapUserStore::default();
         let user = User::new(
             Email::parse("test@example.com").unwrap(),
-            Password::parse("password123!").unwrap(),
+            Password::parse(&Secret::new("password123!".to_string())).unwrap(),
             false,
         );
         store.add_user(user).await.unwrap();
@@ -67,7 +72,7 @@ mod tests {
             .get_user(&Email::parse("test@example.com").unwrap())
             .await
             .unwrap();
-        assert_eq!(retrieved_user.email(), "test@example.com");
+        assert_eq!(retrieved_user.email().expose_secret(), "test@example.com");
     }
 
     #[tokio::test]
@@ -75,7 +80,7 @@ mod tests {
         let mut store = HashMapUserStore::default();
         let user = User::new(
             Email::parse("test@example.com").unwrap(),
-            Password::parse("password123!").unwrap(),
+            Password::parse(&Secret::new("password123!".to_string())).unwrap(),
             false,
         );
         store.add_user(user).await.unwrap();

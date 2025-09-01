@@ -1,6 +1,7 @@
 use axum_extra::extract::cookie::{Cookie, SameSite};
 use color_eyre::eyre::{eyre, Context, ContextCompat, Result};
 use jsonwebtoken::{decode, DecodingKey, Validation};
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -39,7 +40,7 @@ fn generate_auth_token(email: &Email) -> Result<String> {
         .try_into()
         .wrap_err("Failed to convert expiration to usize")?;
 
-    let sub = email.as_ref().to_string();
+    let sub = email.as_ref().expose_secret().to_string();
 
     let claims = Claims {
         sub,
@@ -53,7 +54,7 @@ fn generate_auth_token(email: &Email) -> Result<String> {
 pub async fn validate_token(token: &str) -> Result<Claims> {
     decode::<Claims>(
         token,
-        &DecodingKey::from_secret(JWT_SECRET.as_bytes()),
+        &DecodingKey::from_secret(JWT_SECRET.expose_secret().as_bytes()),
         &Validation::default(),
     )
     .map(|data| data.claims)
@@ -65,7 +66,7 @@ fn create_token(claims: &Claims) -> Result<String> {
     jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
         claims,
-        &jsonwebtoken::EncodingKey::from_secret(JWT_SECRET.as_bytes()),
+        &jsonwebtoken::EncodingKey::from_secret(JWT_SECRET.expose_secret().as_bytes()),
     )
     .map_err(|e| eyre!("Failed to create token: {}", e))
 }

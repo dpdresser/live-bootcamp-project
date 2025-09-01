@@ -1,4 +1,5 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use secrecy::Secret;
 use serde::Deserialize;
 
 use crate::{app_state::AppState, domain::AuthAPIError, utils::validate_token};
@@ -16,7 +17,7 @@ pub async fn verify_token(
         .banned_token_store
         .read()
         .await
-        .is_token_banned(&request.token)
+        .is_token_banned(&Secret::new(request.token.to_string()))
         .await
         .map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
 

@@ -1,5 +1,6 @@
 use color_eyre::eyre::{eyre, Context, Report, Result};
 use rand::Rng;
+use secrecy::{ExposeSecret, Secret};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -42,9 +43,9 @@ impl PartialEq for UserStoreError {
 
 #[async_trait::async_trait]
 pub trait BannedTokenStore {
-    async fn add_token(&mut self, token: &str) -> Result<(), BannedTokenStoreError>;
+    async fn add_token(&mut self, token: &Secret<String>) -> Result<(), BannedTokenStoreError>;
 
-    async fn is_token_banned(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
+    async fn is_token_banned(&self, token: &Secret<String>) -> Result<bool, BannedTokenStoreError>;
 }
 
 #[derive(Debug, Error)]
@@ -101,37 +102,49 @@ impl PartialEq for TwoFACodeStoreError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct LoginAttemptId(String);
+#[derive(Debug, Clone)]
+pub struct LoginAttemptId(Secret<String>);
+
+impl PartialEq for LoginAttemptId {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
 
 impl LoginAttemptId {
     pub fn parse(id: String) -> Result<Self> {
         let parsed_id = uuid::Uuid::parse_str(&id).wrap_err("Invalid login attempt id")?;
 
-        Ok(Self(parsed_id.to_string()))
+        Ok(Self(Secret::new(parsed_id.to_string())))
     }
 }
 
 impl Default for LoginAttemptId {
     fn default() -> Self {
-        Self(Uuid::new_v4().to_string())
+        Self(Secret::new(Uuid::new_v4().to_string()))
     }
 }
 
-impl AsRef<str> for LoginAttemptId {
-    fn as_ref(&self) -> &str {
+impl AsRef<Secret<String>> for LoginAttemptId {
+    fn as_ref(&self) -> &Secret<String> {
         &self.0
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TwoFACode(String);
+#[derive(Clone, Debug)]
+pub struct TwoFACode(Secret<String>);
+
+impl PartialEq for TwoFACode {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
 
 impl TwoFACode {
     pub fn parse(code: String) -> Result<Self> {
         // Ensure `code` is valid 6-digit string
         if code.len() == 6 && code.chars().all(char::is_numeric) {
-            Ok(Self(code))
+            Ok(Self(Secret::new(code)))
         } else {
             Err(eyre!("Invalid TwoFACode format: {code}"))
         }
@@ -142,12 +155,12 @@ impl Default for TwoFACode {
     fn default() -> Self {
         // Use the `rand` crate to generate a random 2FA code
         let code = rand::thread_rng().gen_range(100000..999999);
-        Self(code.to_string())
+        Self(Secret::new(code.to_string()))
     }
 }
 
-impl AsRef<str> for TwoFACode {
-    fn as_ref(&self) -> &str {
+impl AsRef<Secret<String>> for TwoFACode {
+    fn as_ref(&self) -> &Secret<String> {
         &self.0
     }
 }

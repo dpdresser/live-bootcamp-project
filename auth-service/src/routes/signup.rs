@@ -1,4 +1,5 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use secrecy::{ExposeSecret, Secret};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -11,7 +12,8 @@ pub async fn signup(
     State(state): State<AppState>,
     Json(request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    let email = Email::parse(&request.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
+    let email = Email::parse(request.email.expose_secret())
+        .map_err(|_| AuthAPIError::InvalidCredentials)?;
     let password =
         Password::parse(&request.password).map_err(|_| AuthAPIError::InvalidCredentials)?;
     let user = User::new(email, password, request.requires_2fa);
@@ -31,8 +33,8 @@ pub async fn signup(
 
 #[derive(Deserialize)]
 pub struct SignupRequest {
-    email: String,
-    password: String,
+    email: Secret<String>,
+    password: Secret<String>,
     #[serde(rename = "requires2FA")]
     requires_2fa: bool,
 }

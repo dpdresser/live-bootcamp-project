@@ -11,6 +11,7 @@ use auth_service::{
     Application,
 };
 use reqwest::cookie::Jar;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     Connection, Executor, PgConnection, PgPool,
@@ -23,7 +24,7 @@ pub struct TestApp {
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
     pub app_state: AppState,
-    pub db_name: String,
+    pub db_name: Secret<String>,
     pub cleanup_called: bool,
 }
 
@@ -64,7 +65,7 @@ impl TestApp {
             cookie_jar,
             http_client,
             app_state,
-            db_name,
+            db_name: Secret::new(db_name),
             cleanup_called: false,
         }
     }
@@ -142,7 +143,7 @@ impl TestApp {
 impl Drop for TestApp {
     fn drop(&mut self) {
         if !self.cleanup_called {
-            panic!("TestApp was not cleaned up properly {}", self.db_name);
+            panic!("TestApp was not cleaned up properly {:?}", self.db_name);
         }
     }
 }
@@ -158,21 +159,22 @@ async fn configure_postgresql() -> (PgPool, String) {
     let db_name = Uuid::new_v4().to_string();
     configure_database(&postgresql_conn_url, &db_name).await;
 
-    let postgresql_conn_url_with_db = format!("{}/{}", postgresql_conn_url, db_name);
+    let postgresql_conn_url_with_db =
+        format!("{}/{}", postgresql_conn_url.expose_secret(), db_name);
 
     // Create a new connection pool and return it
     (
-        get_postgres_pool(&postgresql_conn_url_with_db)
+        get_postgres_pool(&Secret::new(postgresql_conn_url_with_db))
             .await
             .expect("Failed to create PostgreSQL connection pool"),
         db_name,
     )
 }
 
-async fn configure_database(db_conn_string: &str, db_name: &str) {
+async fn configure_database(db_conn_string: &Secret<String>, db_name: &str) {
     // Create database connection
     let connection = PgPoolOptions::new()
-        .connect(db_conn_string)
+        .connect(db_conn_string.expose_secret())
         .await
         .expect("Failed to connect to PostgreSQL");
 
@@ -183,7 +185,7 @@ async fn configure_database(db_conn_string: &str, db_name: &str) {
         .expect("Failed to create database");
 
     // Connect to new database
-    let db_conn_string_with_db = format!("{}/{}", db_conn_string, db_name);
+    let db_conn_string_with_db = format!("{}/{}", db_conn_string.expose_secret(), db_name);
     let connection = PgPoolOptions::new()
         .connect(&db_conn_string_with_db)
         .await
@@ -196,10 +198,10 @@ async fn configure_database(db_conn_string: &str, db_name: &str) {
         .expect("Failed to run migrations");
 }
 
-async fn delete_database(db_name: &str) {
-    let postgresql_conn_url: String = DB_URL.to_owned();
+async fn delete_database(db_name: &Secret<String>) {
+    let postgresql_conn_url: Secret<String> = DB_URL.to_owned();
 
-    let connection_options = PgConnectOptions::from_str(&postgresql_conn_url)
+    let connection_options = PgConnectOptions::from_str(&postgresql_conn_url.expose_secret())
         .expect("Failed to parse PostgreSQL connection string");
 
     let mut connection = PgConnection::connect_with(&connection_options)
@@ -215,7 +217,7 @@ async fn delete_database(db_name: &str) {
                 FROM pg_stat_activity
                 WHERE pg_stat_activity.datname = '{}'
                 AND pid <> pg_backend_pid();"#,
-                db_name
+                db_name.expose_secret()
             )
             .as_str(),
         )
@@ -223,7 +225,7 @@ async fn delete_database(db_name: &str) {
         .expect("Failed to terminate active connections");
 
     connection
-        .execute(format!(r#"DROP DATABASE "{}";"#, db_name).as_str())
+        .execute(format!(r#"DROP DATABASE "{}";"#, db_name.expose_secret()).as_str())
         .await
         .expect("Failed to drop database");
 }

@@ -1,5 +1,6 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use axum_extra::extract::CookieJar;
+use secrecy::{ExposeSecret, Secret};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -15,10 +16,11 @@ pub async fn login(
     Json(request): Json<LoginRequest>,
 ) -> Result<(CookieJar, impl IntoResponse), AuthAPIError> {
     // Validate email format
-    let email = Email::parse(&request.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
+    let email = Email::parse(request.email.expose_secret())
+        .map_err(|_| AuthAPIError::InvalidCredentials)?;
 
     // Basic password validation - at least not empty
-    if request.password.is_empty() {
+    if request.password.expose_secret().is_empty() {
         return Err(AuthAPIError::InvalidCredentials);
     }
 
@@ -31,7 +33,7 @@ pub async fn login(
         .map_err(|_| AuthAPIError::IncorrectCredentials)?;
 
     user_store
-        .validate_user(&email, &request.password)
+        .validate_user(&email, request.password.expose_secret())
         .await
         .map_err(|_| AuthAPIError::IncorrectCredentials)?;
 
@@ -70,13 +72,13 @@ async fn handle_2fa(
     // Send 2FA code via the email client. Return AuthAPIError::UnexpectedError if it fails.
     let email_client = state.email_client.write().await;
     email_client
-        .send_email(email, "Your 2FA code", two_fa_code.as_ref())
+        .send_email(email, "Your 2FA code", two_fa_code.as_ref().expose_secret())
         .await
         .map_err(AuthAPIError::UnexpectedError)?;
 
     let response = Json(LoginResponse::TwoFactorAuth(TwoFactorAuthResponse {
         message: "2FA required".to_string(),
-        login_attempt_id: login_attempt_id.as_ref().to_string(),
+        login_attempt_id: login_attempt_id.as_ref().expose_secret().to_string(),
     }));
 
     Ok((jar, response))
@@ -97,8 +99,8 @@ async fn handle_no_2fa(
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
-    email: String,
-    password: String,
+    email: Secret<String>,
+    password: Secret<String>,
 }
 
 #[derive(Debug, Serialize)]
